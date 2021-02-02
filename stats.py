@@ -53,6 +53,23 @@ class legWindow:
         """ takes in height in percent and returns calculated pixel value based on screen dimensions """
         return int((self.height/100*height)+self.y)
 
+class legVideo:
+    """ a class with cv2 video info and utils """
+    def __init__(self, videoPath):
+        # simple geometry
+        self.capture = cv2.VideoCapture(videoPath)
+        self.width  = self.capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+        self.height = self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        self.fps = self.capture.get(cv2.CAP_PROP_FPS)
+
+    def wper(self, width):
+        """ takes in width in percent and returns calculated pixel value based on video dimensions """
+        return int(self.width/100*width)
+
+    def hper(self, height):
+        """ takes in height in percent and returns calculated pixel value based on video dimensions """
+        return int(self.height/100*height)
+
 # https://stackoverflow.com/questions/35180764/opencv-python-image-too-big-to-display
 def resizeWithAspectRatio(image, width=None, height=None, inter=cv2.INTER_AREA):
     dim = None
@@ -104,6 +121,31 @@ def main():
         elif i == len(current_windows()):
             print('league client not found, exiting')
 
+def captureVid(videoName):
+    videoPath = str(HERE.joinpath('traindata', 'basev', videoName))
+    video = legVideo(videoPath)
+    frame = 0
+    frameLast = 0
+    secondsBuffer = 69 # ex 60 if we start from 1 min
+
+    ptime = time.perf_counter()
+    while True:
+        success, img = video.capture.read()
+        if frame == frameLast + 60:
+            frameLast = frame
+            roi = img[video.hper(.5):video.hper(2.5), video.wper(96.7):video.wper(99.1)]
+            cv2.imshow('vid', roi)
+            cv2.imwrite(str(HERE.joinpath('traindata', 'clock', f'{round(frameLast/60)+secondsBuffer}.png')), roi)
+
+            print(frame)
+            print(f'second took {round(time.perf_counter()-ptime, 3)} seconds')
+            ptime = time.perf_counter()
+
+        frame=frame+1
+        
+        if cv2.waitKey(1) & 0xFF==ord('q'):
+            break
+
 # capture traindata
 def capture():
     for i, window in enumerate(current_windows()):
@@ -113,14 +155,6 @@ def capture():
 
             with mss.mss() as sct:
                 k = 69
-                print('2..')
-                time.sleep(1)
-                print('1..')
-                time.sleep(1)
-                print('go!')
-                press_key('space')
-                # custom spacer for certain yt vids
-                time.sleep(0.3)
 
                 ptime = time.perf_counter()
                 while True:
@@ -139,4 +173,4 @@ def capture():
             print('league client not found, exiting')
 
 if __name__ == '__main__':
-    capture()
+    captureVid('foxdropgraves-bXdBOIqujbs.mkv')
