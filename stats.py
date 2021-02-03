@@ -1,18 +1,17 @@
 """ 
 get the numerical stats of your game using cv2 and mss
 """
+import csv
+import os
 import time
+from pathlib import Path
 
 import cv2
-
 import mss
 import numpy as np
-from PIL import Image
 
-from winlaunch import current_windows, win_desktop, win_name, win_pos, win_size, press_key
-
-import os
-from pathlib import Path
+from winlaunch import (current_windows, press_key, win_desktop, win_name,
+                       win_pos, win_size)
 
 DEBUG = True
 HERE = Path(__file__).parent.absolute()
@@ -61,6 +60,21 @@ class legVideo:
         self.width  = self.capture.get(cv2.CAP_PROP_FRAME_WIDTH)
         self.height = self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self.fps = self.capture.get(cv2.CAP_PROP_FPS)
+
+    def wper(self, width):
+        """ takes in width in percent and returns calculated pixel value based on video dimensions """
+        return int(self.width/100*width)
+
+    def hper(self, height):
+        """ takes in height in percent and returns calculated pixel value based on video dimensions """
+        return int(self.height/100*height)
+
+class legImg:
+    """ a class with cv2 img info and utils """
+    def __init__(self, imgPath):
+        # simple geometry
+        self.img = cv2.imread(imgPath)
+        self.height, self.width, self.channels = self.img.shape
 
     def wper(self, width):
         """ takes in width in percent and returns calculated pixel value based on video dimensions """
@@ -126,7 +140,8 @@ def captureVid(videoName):
     video = legVideo(videoPath)
     frame = 0
     frameLast = 0
-    secondsBuffer = 69 # ex 60 if we start from 1 min
+    secondsBuffer = 30 # ex 60 if we start from 1 min
+    annotations = []
 
     ptime = time.perf_counter()
     while True:
@@ -135,9 +150,13 @@ def captureVid(videoName):
             frameLast = frame
             roi = img[video.hper(.5):video.hper(2.5), video.wper(96.7):video.wper(99.1)]
             cv2.imshow('vid', roi)
-            cv2.imwrite(str(HERE.joinpath('traindata', 'clock', f'{round(frameLast/60)+secondsBuffer}.png')), roi)
+            filename = str(HERE.joinpath('traindata', 'clock', f'{round(frameLast/60)+secondsBuffer}.png'))
+            cv2.imwrite(filename, roi)
 
-            print(frame)
+            # annotations csv
+            annotations.append([filename, round(frameLast/60)+secondsBuffer])
+
+            print(round(frameLast/60)+secondsBuffer)
             print(f'second took {round(time.perf_counter()-ptime, 3)} seconds')
             ptime = time.perf_counter()
 
@@ -145,6 +164,38 @@ def captureVid(videoName):
         
         if cv2.waitKey(1) & 0xFF==ord('q'):
             break
+
+    # writing to csv fil
+    with open(HERE.joinpath('traindata', 'clock', 'annotations.csv'), 'w') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerows(annotations) 
+
+def clockToDigits():
+    files = sorted(os.listdir(HERE.joinpath('traindata', 'clock')))
+
+    for file in files:
+        timestamp = str(file.replace('.png', '')).zfill(4)
+        if not '.csv' in file:
+            # grab and process image
+            img = legImg(str(HERE.joinpath('traindata', 'clock', file).absolute()))
+            img.img = cv2.cvtColor(img.img, cv2.COLOR_BGR2GRAY)
+            thresh, img.img = cv2.threshold(img.img, 127, 255, cv2.THRESH_BINARY)
+
+            # write digits into their folders
+            digit1 = img.img[img.hper(15):img.hper(80), img.wper(8):img.wper(30)]
+            cv2.imwrite(str(HERE.joinpath('traindata', 'digits', timestamp[0], f"{len(os.listdir(HERE.joinpath('traindata', 'digits', timestamp[0])))}.png").absolute()), digit1)
+
+            digit2 = img.img[img.hper(15):img.hper(80), img.wper(30):img.wper(47)]
+            cv2.imwrite(str(HERE.joinpath('traindata', 'digits', timestamp[1], f"{len(os.listdir(HERE.joinpath('traindata', 'digits', timestamp[1])))}.png").absolute()), digit2)
+
+            digit3 = img.img[img.hper(15):img.hper(80), img.wper(53):img.wper(72)]
+            cv2.imwrite(str(HERE.joinpath('traindata', 'digits', timestamp[2], f"{len(os.listdir(HERE.joinpath('traindata', 'digits', timestamp[2])))}.png").absolute()), digit3)
+
+            digit4 = img.img[img.hper(15):img.hper(80), img.wper(73):img.wper(90)]
+            cv2.imwrite(str(HERE.joinpath('traindata', 'digits', timestamp[3], f"{len(os.listdir(HERE.joinpath('traindata', 'digits', timestamp[3])))}.png").absolute()), digit4)
+
+            # cv2.imshow('rango 3', digit4)
+            # cv2.waitKey(1)
 
 # capture traindata
 def capture():
@@ -173,4 +224,5 @@ def capture():
             print('league client not found, exiting')
 
 if __name__ == '__main__':
-    captureVid('foxdropgraves-bXdBOIqujbs.mkv')
+    # captureVid('pyke-JnrH-W6Cnvs.mp4')
+    clockToDigits()
