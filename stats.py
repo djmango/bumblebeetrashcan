@@ -9,6 +9,8 @@ from pathlib import Path
 import cv2
 import mss
 import numpy as np
+import pytesseract
+from PIL import Image
 
 from winlaunch import (current_windows, press_key, win_desktop, win_name,
                        win_pos, win_size)
@@ -100,6 +102,16 @@ def resizeWithAspectRatio(image, width=None, height=None, inter=cv2.INTER_AREA):
 
     return cv2.resize(image, dim, interpolation=inter)
 
+def convertTimestamp(seconds): 
+    seconds = seconds % (24 * 3600) 
+    hour = seconds // 3600
+    seconds %= 3600
+    minutes = seconds // 60
+    seconds %= 60
+      
+    # return "%d:%02d:%02d" % (hour, minutes, seconds)
+    return "%02d:%02d" % (minutes, seconds)
+
 # main
 def main():
     for i, window in enumerate(current_windows()):
@@ -174,28 +186,34 @@ def clockToDigits():
     files = sorted(os.listdir(HERE.joinpath('traindata', 'clock')))
 
     for file in files:
-        timestamp = str(file.replace('.png', '')).zfill(4)
         if not '.csv' in file:
-            # grab and process image
+            # grab image
             img = legImg(str(HERE.joinpath('traindata', 'clock', file).absolute()))
-            img.img = cv2.cvtColor(img.img, cv2.COLOR_BGR2GRAY)
-            thresh, img.img = cv2.threshold(img.img, 127, 255, cv2.THRESH_BINARY)
+            timestamp = str(file.replace('.png', '')).zfill(4)
+            timestampOCR = pytesseract.image_to_string(Image.fromarray(img.img)).replace('\n', '').strip()
+            timestampFormated = convertTimestamp(int(timestamp))
+            
+            if timestampOCR == timestampFormated:
+                img.img = cv2.cvtColor(img.img, cv2.COLOR_BGR2GRAY)
+                # process image
+                thresh, img.img = cv2.threshold(img.img, 127, 255, cv2.THRESH_BINARY)
 
-            # write digits into their folders
-            digit1 = img.img[img.hper(15):img.hper(80), img.wper(8):img.wper(30)]
-            cv2.imwrite(str(HERE.joinpath('traindata', 'digits', timestamp[0], f"{len(os.listdir(HERE.joinpath('traindata', 'digits', timestamp[0])))}.png").absolute()), digit1)
+                # write digits into their folders
+                digit1 = img.img[img.hper(15):img.hper(80), img.wper(8):img.wper(30)]
+                cv2.imwrite(str(HERE.joinpath('traindata', 'digits', timestamp[0], f"{len(os.listdir(HERE.joinpath('traindata', 'digits', timestamp[0])))}.png").absolute()), digit1)
 
-            digit2 = img.img[img.hper(15):img.hper(80), img.wper(30):img.wper(47)]
-            cv2.imwrite(str(HERE.joinpath('traindata', 'digits', timestamp[1], f"{len(os.listdir(HERE.joinpath('traindata', 'digits', timestamp[1])))}.png").absolute()), digit2)
+                digit2 = img.img[img.hper(15):img.hper(80), img.wper(30):img.wper(47)]
+                cv2.imwrite(str(HERE.joinpath('traindata', 'digits', timestamp[1], f"{len(os.listdir(HERE.joinpath('traindata', 'digits', timestamp[1])))}.png").absolute()), digit2)
 
-            digit3 = img.img[img.hper(15):img.hper(80), img.wper(53):img.wper(72)]
-            cv2.imwrite(str(HERE.joinpath('traindata', 'digits', timestamp[2], f"{len(os.listdir(HERE.joinpath('traindata', 'digits', timestamp[2])))}.png").absolute()), digit3)
+                digit3 = img.img[img.hper(15):img.hper(80), img.wper(53):img.wper(72)]
+                cv2.imwrite(str(HERE.joinpath('traindata', 'digits', timestamp[2], f"{len(os.listdir(HERE.joinpath('traindata', 'digits', timestamp[2])))}.png").absolute()), digit3)
 
-            digit4 = img.img[img.hper(15):img.hper(80), img.wper(73):img.wper(90)]
-            cv2.imwrite(str(HERE.joinpath('traindata', 'digits', timestamp[3], f"{len(os.listdir(HERE.joinpath('traindata', 'digits', timestamp[3])))}.png").absolute()), digit4)
+                digit4 = img.img[img.hper(15):img.hper(80), img.wper(73):img.wper(90)]
+                cv2.imwrite(str(HERE.joinpath('traindata', 'digits', timestamp[3], f"{len(os.listdir(HERE.joinpath('traindata', 'digits', timestamp[3])))}.png").absolute()), digit4)
+                print(f'success at {timestamp} as {timestampOCR}')
 
-            # cv2.imshow('rango 3', digit4)
-            # cv2.waitKey(1)
+            else:
+                print(f'bounced {file}, timestamp {timestamp} ocr\'d as {timestampOCR}')
 
 # capture traindata
 def capture():

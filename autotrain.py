@@ -8,7 +8,7 @@ HERE = Path(__file__).parent.absolute()
 train_data = ak.image_dataset_from_directory(
     HERE.joinpath('traindata', 'digits'),
     image_size=(120, 120),
-    batch_size=16)
+    batch_size=64)
 
 clf = ak.ImageClassifier(overwrite=True, max_trials=1, project_name='digitsTrainer')
 clf.fit(train_data, epochs=5)
